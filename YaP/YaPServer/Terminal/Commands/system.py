@@ -21,36 +21,36 @@ def version(server, args):
 
     return f"Shinezumi RAT\nVersion: {VERSION_STRING}\nBuild: {BUILD}"
 
-def banhost(server, args):
-    """Bans IP from accessing GUI."""
-    with open(os.path.join(server.dirs["configs"], "banned.json"), "r") as banned_f:
-        bf = json.load(banned_f)
+# def banhost(server, args):
+#     """Bans IP from accessing GUI."""
+#     with open(os.path.join(server.dirs["configs"], "banned.json"), "r") as banned_f:
+#         bf = json.load(banned_f)
 
-    if args[0] in bf["banned_usernames"]:
-        return f"Failed: username '{args[0]}' was already banned."
-    bf["banned_usernames"].append(args[0])
+#     if args[0] in bf["banned_usernames"]:
+#         return f"Failed: username '{args[0]}' was already banned."
+#     bf["banned_usernames"].append(args[0])
 
-    with open(os.path.join(server.dirs["configs"], "banned.json"), "w") as banned_f:
-        json.dump(bf, banned_f)
+#     with open(os.path.join(server.dirs["configs"], "banned.json"), "w") as banned_f:
+#         json.dump(bf, banned_f)
 
-    return f"Username '{args[0]}' has been banned."
+#     return f"Username '{args[0]}' has been banned."
 
-def pardonhost(server, args):
-    """Unbans IP from accessing GUI"""
-    with open(os.path.join(server.dirs["configs"], "banned.json"), "r") as banned_f:
-        bf = json.load(banned_f)
+# def pardonhost(server, args):
+#     """Unbans IP from accessing GUI"""
+#     with open(os.path.join(server.dirs["configs"], "banned.json"), "r") as banned_f:
+#         bf = json.load(banned_f)
 
-    if args[0] not in bf["banned_usernames"]:
-        return f"Failed: username '{args[0]}' was not banned."
-    bf["banned_usernames"].remove(args[0])
+#     if args[0] not in bf["banned_usernames"]:
+#         return f"Failed: username '{args[0]}' was not banned."
+#     bf["banned_usernames"].remove(args[0])
 
-    with open(os.path.join(server.dirs["configs"], "banned.json"), "w") as banned_f:
-        json.dump(bf, banned_f)
+#     with open(os.path.join(server.dirs["configs"], "banned.json"), "w") as banned_f:
+#         json.dump(bf, banned_f)
 
-    return f"Username '{args[0]}' has been unbanned."
+#     return f"Username '{args[0]}' has been unbanned."
 
-def bannedhosts(server, args):
-    """Shows what IPs are banned."""
-    with open(os.path.join(server.dirs["configs"], "banned.json"), "r") as banned_f:
-        banned = json.load(banned_f)["banned_usernames"]
-    return ", ".join(banned)
+# def bannedhosts(server, args):
+#     """Shows what IPs are banned."""
+#     with open(os.path.join(server.dirs["configs"], "banned.json"), "r") as banned_f:
+#         banned = json.load(banned_f)["banned_usernames"]
+#     return ", ".join(banned)

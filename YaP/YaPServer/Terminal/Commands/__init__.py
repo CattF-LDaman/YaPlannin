@@ -1,5 +1,5 @@
 
-from .system import stop, reloadconf, version, banhost, pardonhost, bannedhosts
+from .system import stop, reloadconf, version#, banhost, pardonhost, bannedhosts
 from .auth import createuser, removeuser, changepass
 
 import os
@@ -9,7 +9,7 @@ all_cmds = [stop,
             reloadconf, 
             version, 
 
-            banhost, pardonhost, bannedhosts,
+            #banhost, pardonhost, bannedhosts,
 
             createuser, removeuser, changepass,
         ]

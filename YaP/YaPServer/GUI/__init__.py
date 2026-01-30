@@ -5,6 +5,7 @@ from YaP.YaPCore.version import VERSION_STRING
 from YaP.YaPServer.GUI.logo_raw import LOGO_ICO, LOGO_PNG
 from YaP.YaPServer.GUI.geo import get_flag_icon_from_ip
 from YaP.YaPServer.GUI.account import AccountManager
+from YaP.YaPServer.GUI.plan import PlanGUI
 import YaP.YaPServer.GUI.auth
 
 from nicegui import ui, app
@@ -32,6 +33,7 @@ class GUI:
         self.static_dir = self.server.dirs["guistatic"]
 
         AccountManager.GUI = self
+        PlanGUI.GUI = self
 
         # app.add_static_files("/downloads", self.server.dirs['downloads'])
 
@@ -53,6 +55,26 @@ class GUI:
     def add_scrollbar_color(self):
         ui.add_head_html(SCROLLBAR_HEAD)
 
+    def plan_card(self, plan):
+        with ui.card().classes('justify-center items-center'):
+            ui.label(plan["name"]).style('font-weight: 900, color: #666; font-size: 2.5em;')
+            ui.label(plan["description"]).style('color: #555')
+
+            ui.separator()
+            ui.button("View", color="#444", on_click=lambda: ui.navigate.to(f"/plan/{plan['id']}"))
+    
+    @ui.refreshable
+    def plans(self):
+        with ui.row():
+            try:
+                for plan in self.server.database.plans[app.storage.user["username"]]:
+                    self.plan_card(plan)
+            except KeyError:
+                pass
+                
+            ui.button("New", icon='add').props("push fab flat")
+
+
     def index(self):
 
         ui.colors(primary=self.server.config.gui.primary_color, secondary='#333')
@@ -62,7 +84,9 @@ class GUI:
         
         log_switch = self.build_header()
 
-        # Index content here
+        ui.label("Plans").style("font-size: 2em")
+        self.plans()
+        ui.timer(self.server.config.gui.plans_update_interval, self.plans.refresh)
 
         logs = ui.log(max_lines=32).classes("w-full h-120").bind_visibility_from(log_switch, 'value')
         self.server.logger.on_log(logs.push)
@@ -92,4 +116,4 @@ class GUI:
         self.create_logo_files()
         app.add_media_files("/static", self.static_dir)
 
-        ui.run(reload=False, dark=True, title="YaPlannin", favicon="🧭", storage_secret=self.server.config.secret.browser_storage_secret)
+        ui.run(reload=False, port=80, dark=True, title="YaPlannin", favicon="🧭", storage_secret=self.server.config.secret.browser_storage_secret)

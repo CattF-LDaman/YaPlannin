@@ -16,7 +16,8 @@ DEFAULT_CONFIG = {
 
     "gui": {
         "primary_color":"#99f",
-        "action_color":"#33f"
+        "action_color":"#33f",
+        "plans_update_interval": 10,
     },
 
     "banned": {

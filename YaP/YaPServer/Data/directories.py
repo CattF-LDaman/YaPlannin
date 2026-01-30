@@ -7,6 +7,7 @@ def create_directory_structure(server_dir):
                 "configs",
                 "users",
                 "guistatic",
+                "storage"
                 ]
     dirs = {dn:os.path.join(server_dir, dn) for dn in dirnames}
 

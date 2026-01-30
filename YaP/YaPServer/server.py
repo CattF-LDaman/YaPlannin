@@ -9,6 +9,7 @@ from YaP.YaPServer.GUI import GUI
 from YaP.YaPServer.Data.directories import create_directory_structure
 from YaP.YaPServer.Data.config import DEFAULT_CONFIG
 from YaP.YaPServer.Data.userdata import UserDataStorage
+from YaP.YaPServer.Data.database import YaPDB
 
 import os
 import sys
@@ -36,6 +37,7 @@ class Server:
         self.log(f"{self.config.server.title} with version {VERSION_STRING} on {sys.platform}", 10)
 
         self.user_data_storage = self.uds = UserDataStorage(self.dirs["users"])
+        self.database = YaPDB(self)
 
         self.terminal = Terminal(self)
         self.gui = GUI(self)
