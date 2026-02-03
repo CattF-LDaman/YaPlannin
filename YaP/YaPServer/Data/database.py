@@ -70,5 +70,6 @@ class YaPDB:
 
         # Keep cached list updated
         self.plans = self.get_plans()
+        self.server.log(f"New plan for user {user} created: '{name}'")
 
         return plan_id

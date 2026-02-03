@@ -1,6 +1,6 @@
 
 from nicegui import ui, app, client
-
+from YaP.YaPCore.datetime_util import is_iso_date, iso_today, format_minutes
 from YaP.YaPCore.version import VERSION_STRING_SIMPLE
 
 @ui.page("/plan/{plan_id}")
@@ -55,6 +55,163 @@ class PlanGUI:
 
             # menu_btn.on_click(lambda: btns.set_visibility(not btns.visible))
 
+    async def task_edit(self, task_id: str = None, parent_task: str = None):
+        ### Look, maybe spaghetti code is the new meta? Sorry for anybody who tries to read this.
+        task = None
+        is_subtask = parent_task is not None
+
+        if task_id:
+            task = self.plan.get_task_full(task_id) if not is_subtask else self.plan.get_subtask(task_id)
+        if is_subtask:
+            parent_task = self.plan.get_task_full(parent_task)
+
+        with ui.dialog() as dialog, ui.card().style("max-width: 500px; width: 100%;"):
+            with ui.row().classes('justify-center items-center'):
+                ui.icon("assignment", size="2.3em")
+                ui.label(("New task" if not is_subtask else "New subtask") if not task else f"Edit '{task['name']}'").style("font-weight: bold; font-size: 1.6em")
+            
+            task_name = ui.input("Name", value=task["name"] if task else None)
+            task_desc = ui.textarea("Description", value=task["description"] if task else "").style("width: 100%;")
+            
+            task_start = ui.date_input("Start", value=(iso_today() if not task else task["date_start"]) if not parent_task else parent_task["date_start"])
+            if is_subtask:
+                task_start.disable() # Subtasks don't have a start date, shared with parent
+            # task_start.picker.props[":options"] = f'date => date >= "{iso_today()}"' # Ensure date not earlier then today
+            
+            task_end = ui.date_input("End", value=None if not task else task["date_end"]).props('clearable')
+            # task_end.picker.props[":options"] = f'date => date >= "{iso_today()}"'
+            
+            req_effort = ui.number(label="Required Effort", min=0, value=0 if not task else task["base_effort" if not is_subtask else "target_effort"], suffix="minutes")
+            
+            with ui.row():
+                def submit_fnc():
+                    if not is_subtask and not is_iso_date(task_start.value):
+                        ui.notify("Start should be a date with format YYYY-MM-DD", type="negative", position="center")
+                        return
+                    if task_end.value and not is_iso_date(task_end.value):
+                        ui.notify("End should be empty or a date with format YYYY-MM-DD", type="negative", position="center")
+                        return
+                    dialog.submit((task_name.value, task_desc.value, task_start.value, task_end.value, req_effort.value))
+                ui.button("Create" if not task else "Save", color=self.server.config.gui.primary_color, on_click=submit_fnc)
+                ui.button("Cancel", color="#333", on_click=lambda: dialog.submit(None))
+
+        task_values = await dialog
+        if task_values:
+            task_name, task_desc, task_start, task_end, req_effort = task_values
+
+            if not task:
+                if not is_subtask:
+                    created_uuid = self.plan.add_task(name = task_name, description = task_desc, date_start = task_start, date_end = task_end if task_end else None, base_effort = req_effort or 0)
+                    self.server.log(f"[GUI] [{self.gui_user}] Task created: {task_name} {created_uuid}")
+                else:
+                    created_uuid = self.plan.add_subtask(task_id=parent_task["id"], name = task_name, description = task_desc, date_end = task_end if task_end else None, target_effort = req_effort or 0)
+                    self.server.log(f"[GUI] [{self.gui_user}] Subtask for {parent_task['name']} created: {task_name} {created_uuid}")
+            else:
+                if not is_subtask:
+                    self.plan.update_task(task_id = task_id, name = task_name, description = task_desc, date_start = task_start, date_end = task_end if task_end else None, base_effort = req_effort or 0)
+                    self.server.log(f"[GUI] [{self.gui_user}] Task updated: {task_name}")
+                else:
+                    self.plan.update_subtask(subtask_id = task_id, name = task_name, description = task_desc, date_end = task_end if task_end else None, target_effort = req_effort or 0)
+                    self.server.log(f"[GUI] [{self.gui_user}] Subtask for {parent_task['name']} updated: {task_name}")
+            ui.notify(f"{'Task' if not is_subtask else 'Subtask'} {task_name} {'created' if not task else 'updated'}.", type="positive")
+            
+            open_target = (task_id if task else created_uuid) if not is_subtask else parent_task["id"]
+            self.tasks_list.refresh(open_target)
+            
+    def task_view(self, task, opened = False):
+
+        def task_view_title(content):
+            ui.label(content).style("text-transform: uppercase; font-weight: 100; color: #DDD; font-size: 0.7em;")
+
+        with ui.expansion(group="task_list").classes('w-full') as task_exp:
+            with task_exp.add_slot('header'):
+                with ui.column().style("gap: 2px"):
+                    ui.label(task["name"]).style("font-weight: bold; font-size: 1.3em")
+                    with ui.row():
+                        ui.label(f'{task['date_start']} — {task['date_end'] if task['date_end'] else "indefinite"}').style("font-size: 0.9em; color:#aaa")
+                        ui.label(f'{task['percent_completed']}% completed').style("font-size: 0.9em; color:#aaa")
+                    # ui.label(task_summary).style("font-size: 0.9em; color:#aaa")
+                ui.space()
+            
+            if task["description"]:
+                with ui.column().style("gap: 0;"):
+                    task_view_title("description")
+                    ui.label(task["description"]).style('white-space: pre-wrap') 
+
+            with ui.column().style("gap: 0;"):
+                task_view_title("completion")
+                with ui.grid(columns=2):
+                    ui.label("Work required")
+                    ui.label(format_minutes(task["effort"])).style('color: #999;') 
+
+                    ui.label("Work done")
+                    ui.label(format_minutes(task["total_effort_done"])).style('color: #999;') 
+
+            with ui.column().style("gap: 0; margin-top: 1em; width: 100%;"):
+                task_view_title("subtasks")
+                for subtask in task["subtasks"]:
+                    with ui.expansion(group=task['id']).style("min-width: 50%;") as subtask_exp:
+                        with subtask_exp.add_slot('header'):
+                            # with ui.column().style("gap: 2px"):
+
+                            with ui.row():
+                                if subtask["target_effort"]:
+                                    prog = subtask["effort_done"]/subtask["target_effort"]
+                                    ui.circular_progress(value=prog, size="sm", show_value=None).props("rounded track-color='grey-8'")
+
+                                ui.label(subtask["name"]).style("font-size: 1em")
+                            ui.space()
+
+                        with ui.column().style("border-left: 1px solid gray; padding-left: 0.5em;"):
+
+                            if subtask["description"]:
+                                ui.label(subtask["description"]).style('white-space: pre-wrap; color: #999;') 
+
+                            with ui.row().style("gap: 0;"):
+                                ui.button(icon='edit', 
+                                        on_click=lambda s=subtask, t=task: self.task_edit(s['id'], parent_task=t['id'])
+                                        ).props("flat rounded size=xs color=grey")
+
+                                def delete_subtask(s=subtask): 
+                                    self.plan.delete_subtask(s["id"])
+                                    self.tasks_list.refresh(task['id'])
+                                    ui.notify(f"{s['name']} deleted.", type="warning")
+
+                                ui.button(icon='delete', 
+                                        on_click=lambda f=delete_subtask, s=subtask: self.GUI.confirm_action(
+                                            f, 
+                                            message=f"Are you sure you want to permanently delete '{s['name']}'?", 
+                                            title=f"Delete '{s['name']}'", 
+                                            icon="delete")
+                                        ).props("flat rounded size=xs color=negative")
+
+                ui.button("Add subtask", icon='add', on_click = lambda: self.task_edit(parent_task=task["id"])).props("flat rounded size=sm")
+
+            with ui.row().style("gap: 0;"):
+                ui.button(icon='edit', on_click=lambda: self.task_edit(task['id'])).props("flat rounded size=sm color=grey")
+
+                def delete_task():
+                    self.plan.delete_task(task["id"])
+                    self.tasks_list.refresh()
+                    ui.notify(f"{task['name']} deleted.", type="warning")
+                ui.button(icon='delete', on_click=lambda: self.GUI.confirm_action(delete_task, message=f"Are you sure you want to permanently delete '{task['name']}'?", title=f"Delete '{task['name']}'", icon="delete")).props("flat rounded size=sm color=negative")
+
+            ui.separator()
+
+        if opened: # For task_list refresh after an edit/addition
+            task_exp.open()
+            
+    @ui.refreshable
+    def tasks_list(self, opened: str = None):
+
+        if not (tasks := self.plan.get_tasks_full()):
+            ui.label("No tasks found, create one with the + button above.")
+            return
+        
+        for task in tasks:
+            self.task_view(task, opened = True if task['id'] == opened else False)
+
+
     def dashboard(self):
 
 
@@ -63,7 +220,7 @@ class PlanGUI:
 
 
         with ui.fab('add', label='', color='#999', direction='down').classes('mx-auto'):
-            ui.fab_action('assignment_add', label='Task', color='#999')
+            ui.fab_action('assignment_add', label='Task', on_click=self.task_edit, color='#999')
             ui.fab_action('event', label='Event', color='#999')
             ui.fab_action('hiking', label='Work', color='#999')
 
@@ -75,7 +232,7 @@ class PlanGUI:
         with ui.tab_panels(tabs, value=tasks_tab).classes('w-full'):
             with ui.tab_panel(tasks_tab):
                 
-                pass
+                self.tasks_list()
 
             with ui.tab_panel(schedule_tab):
 

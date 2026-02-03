@@ -2,7 +2,7 @@
 from YaP.YaPCore.threading import threaded_daemon
 from YaP.YaPCore.version import VERSION_STRING
 
-from YaP.YaPServer.GUI.logo_raw import LOGO_ICO, LOGO_PNG
+from YaP.YaPServer.GUI.logo_raw import LOGO_ICO, LOGO_PNG, LOGO_EDGE_PNG
 from YaP.YaPServer.GUI.geo import get_flag_icon_from_ip
 from YaP.YaPServer.GUI.account import AccountManager
 from YaP.YaPServer.GUI.plan import PlanGUI
@@ -21,6 +21,35 @@ SCROLLBAR_HEAD = r"""<style>
 html{
     scrollbar-color: hsl(0,0%,46%) transparent;
 }</style>"""
+
+BG_HTML = """
+<style>
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+
+    /* Path to your logo */
+    background-image: url("/static/logo-edge.png");
+    
+    /* Center the image and prevent tiling */
+    background-repeat: no-repeat;
+    background-position: center;
+    
+    /* Scale the logo - adjust '50vw' to make it larger or smaller */
+
+
+    /* "Very very slight visibility" - adjust opacity between 0.01 and 0.05 */
+    filter: grayscale(1) opacity(0.01); 
+    
+    z-index: -1; 
+    pointer-events: none; /* Ensures the background doesn't block clicks */
+}
+</style>
+"""
 
 class GUI:
 
@@ -42,11 +71,14 @@ class GUI:
     def create_logo_files(self):
         with open(os.path.join(self.static_dir, "logo.png"), "wb") as png:
             png.write(LOGO_PNG)
+        with open(os.path.join(self.static_dir, "logo-edge.png"), "wb") as png:
+            png.write(LOGO_EDGE_PNG)
 
     def add_font(self):
 
         font = '"Quicksand", sans-serif'
         ui.add_head_html(FONT_HEAD)
+
         classes = [cls for name, cls in inspect.getmembers(ui, inspect.isclass) if hasattr(cls, 'default_style') and callable(getattr(cls, 'default_style'))] 
         for eclass in classes:
             if eclass != ui.icon:
@@ -54,6 +86,22 @@ class GUI:
 
     def add_scrollbar_color(self):
         ui.add_head_html(SCROLLBAR_HEAD)
+
+    async def confirm_action(self, action, message = "Are you sure?", title = "Confirm", icon = "warning"):
+
+        with ui.dialog() as dialog, ui.card():
+            with ui.row():
+                ui.icon(icon, size="2.3em")
+                ui.label(title).style("font-weight: bold; font-size: 1.6em")
+            ui.label(message)
+            sure = ui.checkbox("Yes, do it already!")
+            with ui.row():
+                ui.button("Do it!", color="#f33", on_click=lambda: dialog.submit(True)).bind_enabled_from(sure, 'value')
+                ui.button("Cancel", color="#333", on_click=lambda: dialog.submit(False))
+        should_do = await dialog
+
+        if should_do:
+            action()
 
     def plan_card(self, plan):
         with ui.card().classes('justify-center items-center'):
@@ -63,6 +111,28 @@ class GUI:
             ui.separator()
             ui.button("View", color="#444", on_click=lambda: ui.navigate.to(f"/plan/{plan['id']}"))
     
+    async def new_plan(self):
+
+        with ui.dialog() as dialog, ui.card().style("max-width: 300px; width: 100%;").classes('justify-center items-center'):
+            with ui.row():
+                ui.icon("rocket_launch", size="2.3em")
+                ui.label("Create a new plan").style("font-weight: bold; font-size: 1.6em")
+            plan_name = ui.input("Name")
+            plan_desc = ui.input("Short Description")
+            with ui.row():
+                submit_fnc = lambda: dialog.submit((plan_name.value, plan_desc.value))
+                ui.button("Create", color=self.server.config.gui.primary_color, on_click=submit_fnc)
+                ui.button("Cancel", color="#333", on_click=lambda: dialog.submit(None))
+            plan_name.on("keydown.enter", submit_fnc)
+            plan_desc.on("keydown.enter", submit_fnc)
+
+        plan = await dialog
+
+        if plan:
+            plan_name, plan_desc = plan
+            self.server.database.new_plan(app.storage.user["username"], plan_name, plan_desc)
+            self.plans.refresh()
+
     @ui.refreshable
     def plans(self):
         with ui.row():
@@ -72,7 +142,6 @@ class GUI:
             except KeyError:
                 pass
                 
-            ui.button("New", icon='add').props("push fab flat")
 
 
     def index(self):
@@ -81,12 +150,14 @@ class GUI:
 
         self.add_font()
         self.add_scrollbar_color()
+        ui.add_head_html(BG_HTML)
         
         log_switch = self.build_header()
 
         ui.label("Plans").style("font-size: 2em")
         self.plans()
         ui.timer(self.server.config.gui.plans_update_interval, self.plans.refresh)
+        ui.button("New", icon='add', on_click=self.new_plan).props("push fab flat")
 
         logs = ui.log(max_lines=32).classes("w-full h-120").bind_visibility_from(log_switch, 'value')
         self.server.logger.on_log(logs.push)

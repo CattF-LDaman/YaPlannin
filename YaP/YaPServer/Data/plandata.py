@@ -25,6 +25,7 @@ class PlanData:
         task_id TEXT NOT NULL,
         name TEXT NOT NULL,
         description TEXT NOT NULL DEFAULT '',
+        date_end TEXT,
         target_effort INTEGER NOT NULL DEFAULT 0,
         effort_done INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
@@ -117,22 +118,22 @@ class PlanData:
     # ----------------------------
     # SUBTASKS CRUD
     # ----------------------------
-    def add_subtask(self, task_id: str, name: str, description: str, target_effort: int = 0) -> str:
+    def add_subtask(self, task_id: str, name: str, description: str, date_end: Optional[str] = None, target_effort: int = 0) -> str:
         if not self.get_task(task_id):
             raise ValueError(f"Cannot create subtask: task not found {task_id}")
 
         subtask_id = _uid()
         self.conn.execute(
             """
-            INSERT INTO subtasks (id, task_id, name, description, target_effort, effort_done)
-            VALUES (?, ?, ?, ?, ?, 0)
+            INSERT INTO subtasks (id, task_id, name, description, date_end, target_effort, effort_done)
+            VALUES (?, ?, ?, ?, ?, ?, 0)
             """,
-            (subtask_id, task_id, name, description, int(target_effort)),
+            (subtask_id, task_id, name, description, date_end, int(target_effort)),
         )
         self.conn.commit()
         return subtask_id
 
-    def update_subtask(self, subtask_id: str, name: Optional[str] = None, description: Optional[str] = None, target_effort: Optional[int] = None) -> None:
+    def update_subtask(self, subtask_id: str, name: Optional[str] = None, description: Optional[str] = None, date_end: Optional[str] = None, target_effort: Optional[int] = None) -> None:
         sub = self.get_subtask(subtask_id)
         if not sub:
             raise ValueError(f"Subtask not found: {subtask_id}")
@@ -140,12 +141,13 @@ class PlanData:
         self.conn.execute(
             """
             UPDATE subtasks
-            SET name = ?, description = ?, target_effort = ?
+            SET name = ?, description = ?, date_end = ?, target_effort = ?
             WHERE id = ?
             """,
             (
                 name if name is not None else sub["name"],
                 description if description is not None else sub["description"],
+                date_end if date_end is not None else sub["date_end"],
                 int(target_effort) if target_effort is not None else sub["target_effort"],
                 subtask_id,
             ),
