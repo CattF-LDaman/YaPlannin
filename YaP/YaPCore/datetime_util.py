@@ -1,5 +1,5 @@
 
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 def is_iso_date(dt_str: str):
     try:
@@ -35,3 +35,14 @@ def format_minutes(total_minutes: int) -> str:
         parts.append(f"{minutes}m")
 
     return " ".join(parts)
+
+def now_time():
+
+    return datetime.now().strftime("%H:%M")
+
+def time_ago(minutes):
+    # Calculate the time difference
+    past_time = datetime.now() - timedelta(minutes=minutes)
+    
+    # Return formatted string
+    return past_time.strftime("%H:%M")
