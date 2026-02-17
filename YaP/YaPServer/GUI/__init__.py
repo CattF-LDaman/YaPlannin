@@ -20,6 +20,7 @@ FONT_HEAD = r"""<link rel="preconnect" href="https://fonts.googleapis.com">
 SCROLLBAR_HEAD = r"""<style>
 html{
     scrollbar-color: hsl(0,0%,46%) transparent;
+    overflow-y: scroll;
 }</style>"""
 
 BG_HTML = """
@@ -148,7 +149,7 @@ class GUI:
 
         ui.colors(primary=self.server.config.gui.primary_color, secondary='#333')
 
-        self.add_font()
+        # self.add_font()
         self.add_scrollbar_color()
         ui.add_head_html(BG_HTML)
         

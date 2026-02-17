@@ -1,7 +1,8 @@
 import os
 import uuid
+import math
 from typing import Optional, List, Dict, Any
-
+from datetime import date
 
 def _uid() -> str:
     return str(uuid.uuid4())
@@ -256,6 +257,28 @@ class PlanData:
     # ----------------------------
     # Seamless metrics (integrated)
     # ----------------------------
+    def get_task_progress(self, task):
+        # Parse the strings into date objects
+        start = date.fromisoformat(task["date_start"])
+        end = date.fromisoformat(task["date_end"])
+        today = date.today()
+
+        # 1. Get the total amount of days
+        # This represents the full duration of the task
+        total_duration = (end - start).days
+
+        # 2. Get the progress percentage (0 to 1)
+        if total_duration <= 0:
+            # Avoid division by zero: if start and end are the same day
+            progress = 1.0 if today >= end else 0.0
+        else:
+            elapsed = (today - start).days
+            # Use max/min to clamp the value between 0.0 and 1.0
+            # (e.g., if today is before the start date or after the end date)
+            progress = max(0.0, min(1.0, elapsed / total_duration))
+
+        return total_duration, progress
+
     def _apply_task_metrics(self, task: Dict[str, Any], subtasks: List[Dict[str, Any]]) -> Dict[str, Any]:
         base_effort = int(task["base_effort"])
         base_done = int(task["effort_done"])
@@ -268,11 +291,22 @@ class PlanData:
 
         percent = (total_done / effort) if effort > 0 else 0.0
 
+        if task["date_end"]:
+            duration_days, progress_necessary = self.get_task_progress(task)
+            effort_necessary = math.ceil(progress_necessary*effort)
+            effort_behind = max(effort_necessary - total_done, 0)
+        else:
+            effort_behind = effort_necessary = progress_necessary = duration_days = 0
+
         task = dict(task)
         task["subtasks"] = subtasks
         task["effort"] = effort
         task["total_effort_done"] = total_done
         task["percent_completed"] = percent
+        task["duration_days"] = duration_days
+        task["progress_necessary"] = progress_necessary
+        task["effort_necessary"] = effort_necessary
+        task["effort_behind"] = effort_behind
 
         return task
 

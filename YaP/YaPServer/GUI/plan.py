@@ -3,6 +3,9 @@ from nicegui import ui, app, client
 from YaP.YaPCore.datetime_util import is_iso_date, iso_today, format_minutes, now_time, time_ago
 from YaP.YaPCore.version import VERSION_STRING_SIMPLE
 
+from .task_tab import TaskTab
+from .schedule_tab import ScheduleTab
+
 @ui.page("/plan/{plan_id}")
 def plan_gui(plan_id, client: client.Client):
     PlanGUI(plan_id, client, app.storage.user.get('username', ""))
@@ -25,6 +28,8 @@ class PlanGUI:
             self.plan = self.server.database.plan_data[plan_id]
         except KeyError:
             ui.notify("Not found!", type="negative")
+
+        self.task_list = None
 
         ui.colors(primary=self.server.config.gui.primary_color, secondary='#333')
         self.GUI.add_font()
@@ -66,9 +71,9 @@ class PlanGUI:
                 ui.label("Add work" if not work else "Edit work").style("font-weight: bold; font-size: 1.6em")
             
             task_options = {task['id']: task["name"] for task in self.plan.get_tasks()}
-            task = ui.select(task_options, label="Task")
+            task = ui.select(task_options, label="Task").style("min-width: 60%")
 
-            subtask = ui.select({}, label="Subtask")
+            subtask = ui.select({}, label="Subtask").style("min-width: 60%")
             def update_subtask_options(e):
                 subtask_options = {st['id']: st["name"] for st in self.plan.get_subtasks_for_task(e.value)}
                 subtask_options[None] = "< empty >"
@@ -82,15 +87,18 @@ class PlanGUI:
                 today_switch = ui.switch("Change?", value=False)
                 work_date.bind_enabled_from(today_switch, "value")
             
-            minutes_worked = ui.number(label="Minutes Worked", min=1, value=1 if not work else work["minutes"], suffix="minutes")
+            minutes_worked = ui.number(label="Minutes Worked", min=1, value=1 if not work else work["minutes"], suffix="minutes").style("min-width: 60%")
             
-            work_time = ui.time_input(value=now_time() if not work else work["start_time"])
+            work_time = ui.time_input(value=now_time() if not work else work["start_time"]).style("min-width: 60%")
             now_switch = ui.switch("Now?", on_change=lambda e: work_time.set_visibility(not e.value))
 
             with ui.row():
                 def submit_fnc():
                     if not is_iso_date(work_date.value):
-                        ui.notify("Work date should be a date with format YYYY-MM-DD", type="negative", position="center")
+                        ui.notify("Work date should be a date with format YYYY-MM-DD", type="negative")
+                        return
+                    if not task.value:
+                        ui.notify("No task provided.", type="negative")
                         return
                     timestamp = work_time.value if not now_switch.value else time_ago(minutes_worked.value)
                     dialog.submit((task.value, subtask.value, work_note.value if work_note.value else "", work_date.value, minutes_worked.value, timestamp))
@@ -179,120 +187,8 @@ class PlanGUI:
             ui.notify(f"{'Task' if not is_subtask else 'Subtask'} {task_name} {'created' if not task else 'updated'}.", type="positive")
             
             open_target = (task_id if task else created_uuid) if not is_subtask else parent_task["id"]
-            self.tasks_list.refresh(open_target)
-            
-    def task_view(self, task, opened = False):
-
-        def task_view_title(content):
-            ui.label(content).style("text-transform: uppercase; font-weight: 100; color: #DDD; font-size: 0.7em;")
-
-        with ui.expansion(group="task_list").classes('w-full').style(f"border-left: 5px dashed #222; border-radius: 12px;") as task_exp:
-            with task_exp.add_slot('header'):
-                with ui.column().style("gap: 2px"):
-                    ui.label(task["name"]).style("font-weight: bold; font-size: 1.3em")
-                    with ui.row():
-                        ui.label(f'{task['date_start']} — {task['date_end'] if task['date_end'] else "indefinite"}').style("font-size: 0.9em; color:#666")
-                        ui.label(f'{round(task["percent_completed"]*100, 2)}% completed').style("font-size: 0.9em; color:#aaa")
-                    # ui.label(task_summary).style("font-size: 0.9em; color:#aaa")
-                ui.space()
-            
-            if task["description"]:
-                with ui.column().style("gap: 0;"):
-                    task_view_title("description")
-                    ui.label(task["description"]).style('white-space: pre-wrap') 
-
-            with ui.column().style("gap: 0;"):
-                task_view_title("completion")
-                with ui.grid(columns=2):
-                    ui.label("Work required")
-                    ui.label(format_minutes(task["effort"])).style('color: #999;') 
-
-                    ui.label("Work done")
-                    with ui.row():
-                        ui.label(format_minutes(task["total_effort_done"])).style('color: #999;')
-                        ui.label(f'({format_minutes(task["effort"] - task["total_effort_done"])} left)').style('color: #999;')
-
-                ui.label(f"{round(task["percent_completed"]*100, 2)}% completed").style("text-transform: uppercase; font-weight: 100; color: #AAA; font-size: 0.7em; letter-spacing: 1px;")
-                ui.linear_progress(task["percent_completed"], show_value=False).props("size=md stripe track-color='grey-8'").style("width: 100%;")
-
-            with ui.column().style("gap: 0; margin-top: 1em; width: 100%;"):
-                task_view_title("subtasks")
-                for subtask in task["subtasks"]:
-                    with ui.expansion(group=task['id']).style("min-width: 280px; width: 50%;") as subtask_exp:
-                        with subtask_exp.add_slot('header'):
-                            # with ui.column().style("gap: 2px"):
-
-                            with ui.row():
-                                if subtask["target_effort"]:
-                                    prog = subtask["effort_done"]/subtask["target_effort"]
-                                    ui.circular_progress(value=prog, size="sm", show_value=None).props("rounded track-color='grey-8'").tooltip(f"{round(prog*100,2)}% completed")
-
-                                ui.label(subtask["name"]).style("font-size: 1em")
-                            
-                            ui.space()
-
-                        with ui.column().style("border-left: 1px solid gray; padding-left: 0.5em; width: 100%;"):
-
-                            if subtask["description"]:
-                                ui.label(subtask["description"]).style('white-space: pre-wrap; color: #999;') 
-
-
-                            with ui.row().style("width: 100%;"):
-
-                                if subtask["target_effort"]:
-                                    ui.label(f"{format_minutes(subtask['effort_done'])} / {format_minutes(subtask['target_effort'])}").style("color: #666").tooltip("Work done / Time required")
-                                    ui.label(f"{round(subtask['effort_done']/subtask['target_effort']*100)}%").style("color: #666").tooltip("Percent completed")
-
-                                if subtask["date_end"]:
-                                    ui.label(f"due {subtask["date_end"]}").style("color: #666").tooltip("Deadline")
-
-                                with ui.row().style("display: flex; align-items: center; justify-content: flex-end; gap: 10px; ;margin-left: auto;border-radius: 10px;background: rgba(255, 255, 255, 0.02);border: 1px solid rgba(255, 255, 255, 0.04);"):
-                                    ui.button(icon='edit', 
-                                            on_click=lambda s=subtask, t=task: self.task_edit(s['id'], parent_task=t['id'])
-                                            ).props("flat rounded size=xs color=grey").tooltip("Edit subtask")
-
-                                    def delete_subtask(s=subtask): 
-                                        self.plan.delete_subtask(s["id"])
-                                        self.tasks_list.refresh(task['id'])
-                                        ui.notify(f"{s['name']} deleted.", type="warning")
-
-                                    ui.button(icon='delete', 
-                                            on_click=lambda f=delete_subtask, s=subtask: self.GUI.confirm_action(
-                                                f, 
-                                                message=f"Are you sure you want to permanently delete '{s['name']}'?", 
-                                                title=f"Delete '{s['name']}'", 
-                                                icon="delete")
-                                            ).props("flat rounded size=xs color=negative").tooltip("Delete subtask")
-
-                ui.button("Add subtask", icon='add', on_click = lambda: self.task_edit(parent_task=task["id"])).props("flat rounded size=sm")
-
-            with ui.row().style("display: flex; align-items: center; justify-content: flex-end; gap: 10px; ;margin-left: auto;border-radius: 10px;background: rgba(255, 255, 255, 0.02);border: 1px solid rgba(255, 255, 255, 0.04);"):
-                ui.button(icon='edit', on_click=lambda: self.task_edit(task['id'])).props("flat rounded size=sm color=grey").tooltip("Edit task")
-
-                def delete_task():
-                    self.plan.delete_task(task["id"])
-                    self.tasks_list.refresh()
-                    ui.notify(f"{task['name']} deleted.", type="warning")
-                ui.button(icon='delete', on_click=lambda: self.GUI.confirm_action(delete_task, message=f"Are you sure you want to permanently delete '{task['name']}'?", title=f"Delete '{task['name']}'", icon="delete")).props("flat rounded size=sm color=negative").tooltip("Delete task")
-
-        ui.separator()
-
-        if opened: # For task_list refresh after an edit/addition
-            task_exp.open()
-
-    @ui.refreshable
-    def tasks_list(self, opened: str = None):
-
-        if not (tasks := self.plan.get_tasks_full()):
-            ui.label("No tasks found, create one with the + button above.")
-            return
-        
-        for task_n, task in enumerate(tasks):
-            self.task_view(task, 
-                           opened = True if task['id'] == opened else False, 
-                           )
-
-
+            self.task_list.refresh(open_target)
+    
     def dashboard(self):
 
 
@@ -313,8 +209,9 @@ class PlanGUI:
         with ui.tab_panels(tabs, value=tasks_tab).classes('w-full').style("border-radius:10px;"):
             with ui.tab_panel(tasks_tab):
                 
-                self.tasks_list()
+                self.task_list = TaskTab(self).tasks_list
+                self.task_list()
 
             with ui.tab_panel(schedule_tab):
 
-                pass
+                ScheduleTab(self).schedule()
