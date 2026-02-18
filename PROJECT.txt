@@ -1,45 +1,17 @@
 
 YaPlannin
 
-IDEA: Work is split into tasks: courses, assignments
---> Tasks have subtasks eg. study chapter 1
---> Tasks have a start and end, user is shown how much work should be done that day/week, and manually plans it in schedule
---> Schedule can contain activities: CAN have timestamps, CAN be either linked to work on (sub)task, OR something else (eg. go dentist)
 ---------------------------
 TODO:
 
-Task creation + view
+Dashboard:
+- Warnings and notifications: show warnings like "Deadline coming up", or "Behind schedule on task X"
+
+- Deadlines overview
+--> Include subtask deadlines, below task deadline with a little indent
+
+- Effort behind overview: work TODO
+- Effort overview: total effort to be done, total effort done, percentage completed, etc.
 
 
 ---------------------------
-
-Task
-- id
-
-- name
-- description
-- date_start
-- date_end # (optional)
-
-- base_effort # (minutes) Effort needed for task, outside of subtasks
-+ effort_done # (minutes) How much work has been done (for base_effort)
-
--> has Subtasks
-
-@ effort = total time needed for Task + Subtasks
-@ total_effort_done = (effort_done + Subtasks.effort_done)
-@ percent_completed = total_effort_done / effort
-
-Subtasks
-- id
--> Task id
-
-- name
-- description
-
-- target_effort  # (minutes) Effort needed for Subtask
-+ effort_done # (minutes) How much work has been done (for target_effort)
-
-Schedule
-
-- free_days # list of days where no work can be planned in
