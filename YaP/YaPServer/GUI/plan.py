@@ -52,12 +52,15 @@ class PlanGUI:
             with ui.column():
                 with ui.row():
                     ui.label(self.plan.name).style("font-weight: bold; font-size: 2.1em")
-                    with ui.row():
-                        ui.icon("person", size="1.4em")
-                        ui.label(self.plan.user).style("font-size: 1em; color:#aaa")
                 ui.label(self.plan.desc).style("color: #999")
 
                     # menu_btn = ui.button(icon='menu', color="rgb(37, 37, 37)")
+            
+            with ui.column():
+                with ui.row():
+                    ui.icon("person", size="1.4em")
+                    ui.label(self.plan.user).style("font-size: 1em; color:#aaa")
+                ui.button("Other plans", icon='keyboard_return', on_click = lambda: ui.navigate.to("/")).props("flat rounded")
 
             # menu_btn.on_click(lambda: btns.set_visibility(not btns.visible))
 

@@ -90,3 +90,15 @@ def is_within_next_week(iso_str):
     except (ValueError, TypeError):
         # Returns False if input is not a valid ISO string or not a string at all
         return False
+    
+def get_week_days(d):
+    """
+    Returns list of 7 days (YYYY-MM-DD) for the week containing date d.
+    Week starts on Monday. Like it fucking should be.
+    """
+    monday = d - timedelta(days=d.weekday())
+    return [(monday + timedelta(days=i)).isoformat() for i in range(7)]
+
+def this_week():
+
+    return get_week_days(date.today())

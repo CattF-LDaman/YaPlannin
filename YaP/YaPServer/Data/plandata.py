@@ -311,13 +311,15 @@ class PlanData:
             base_duration_days, base_progress_necessary, subtask_progresses = self.get_task_progress(task, subtasks)
             base_effort_necessary = math.ceil(base_progress_necessary*base_effort)
             base_effort_behind = max(base_effort_necessary - base_done, 0)
+            base_pressure = base_effort_necessary - base_done
             base_daily_effort = base_effort/base_duration_days
             base_weekly_effort = base_daily_effort * 7
         else:
-            base_effort_behind = base_effort_necessary = base_progress_necessary = base_duration_days = base_daily_effort = base_weekly_effort = 0
+            base_effort_behind = base_effort_necessary = base_progress_necessary = base_duration_days = base_pressure = base_daily_effort = base_weekly_effort = 0
             subtask_progresses = None
 
         total_effort_behind = base_effort_behind
+        total_pressure = base_pressure
 
         for subtask in subtasks:
             subtask["date_start"] = task["date_start"]
@@ -327,6 +329,7 @@ class PlanData:
                 sub_duration_days, sub_progress_necessary = subtask_progresses[subtask["id"]]
                 sub_effort_necessary = math.ceil(sub_progress_necessary*subtask["target_effort"])
                 sub_effort_behind = max(sub_effort_necessary - subtask["effort_done"], 0)
+                sub_pressure = sub_effort_necessary - subtask["effort_done"]
                 sub_daily_effort = subtask["target_effort"]/sub_duration_days
                 sub_weekly_effort = sub_daily_effort*7
 
@@ -338,6 +341,7 @@ class PlanData:
                 subtask["weekly_effort"] = sub_weekly_effort
 
                 total_effort_behind += sub_effort_behind
+                total_pressure += sub_pressure
             else:
                 subtask["duration_days"] = subtask["progress_necessary"] = subtask["effort_necessary"] = subtask["effort_behind"] = subtask["daily_effort"] = subtask["weekly_effort"] = 0
 
@@ -354,6 +358,7 @@ class PlanData:
         task["total_effort_behind"] = total_effort_behind
         task["daily_effort"] = base_daily_effort
         task["weekly_effort"] = base_weekly_effort
+        task["pressure"] = total_pressure
 
         return task
 
@@ -379,6 +384,9 @@ class PlanData:
             for t in tasks
         ]
 
+    def get_plan_pressure(self):
+        tasks = self.get_tasks_full()
+        return sum(task["pressure"] for task in tasks), sum(task["effort"] for task in tasks)
     # ----------------------------
     # Schedule days
     # ----------------------------
