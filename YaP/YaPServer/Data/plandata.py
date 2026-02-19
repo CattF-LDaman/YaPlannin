@@ -166,7 +166,7 @@ class PlanData:
                 name if name is not None else task["name"],
                 description if description is not None else task["description"],
                 date_start if date_start is not None else task["date_start"],
-                date_end if date_end is not None else task["date_end"],
+                date_end,
                 int(base_effort) if base_effort is not None else task["base_effort"],
                 task_id,
             ),
@@ -224,7 +224,7 @@ class PlanData:
             (
                 name if name is not None else sub["name"],
                 description if description is not None else sub["description"],
-                date_end if date_end is not None else sub["date_end"],
+                date_end,
                 int(target_effort) if target_effort is not None else sub["target_effort"],
                 subtask_id,
             ),
