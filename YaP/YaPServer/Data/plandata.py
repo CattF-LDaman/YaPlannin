@@ -339,7 +339,7 @@ class PlanData:
 
                 total_effort_behind += sub_effort_behind
             else:
-                subtask["duration_days"] = subtask["progress_necessary"] = subtask["effort_necessary"] = subtask["effort_behind"] = None
+                subtask["duration_days"] = subtask["progress_necessary"] = subtask["effort_necessary"] = subtask["effort_behind"] = subtask["daily_effort"] = subtask["weekly_effort"] = 0
 
 
         task = dict(task)
