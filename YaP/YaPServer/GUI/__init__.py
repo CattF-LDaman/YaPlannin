@@ -149,16 +149,17 @@ class GUI:
 
         ui.colors(primary=self.server.config.gui.primary_color, secondary='#333')
 
-        # self.add_font()
+        self.add_font()
         self.add_scrollbar_color()
         ui.add_head_html(BG_HTML)
         
         log_switch = self.build_header()
 
-        ui.label("Plans").style("font-size: 2em")
+        with ui.row():
+            ui.label("Plans").style("font-size: 2em")
+            ui.button("New", icon='add', on_click=self.new_plan).props("push fab flat")
         self.plans()
         ui.timer(self.server.config.gui.plans_update_interval, self.plans.refresh)
-        ui.button("New", icon='add', on_click=self.new_plan).props("push fab flat")
 
         logs = ui.log(max_lines=32).classes("w-full h-120").bind_visibility_from(log_switch, 'value')
         self.server.logger.on_log(logs.push)
@@ -168,6 +169,9 @@ class GUI:
                 self.server.terminal.parse(cmd.value.strip())
                 cmd.value = ""
         cmd.on("keydown.enter", run_cmd)
+
+        with ui.footer().style("background-color: #111;"):
+            ui.label("Made with ❤️ by Luwe Daman").style("width: 100%; text-align: center; font-size: 0.75em; font-weight: 100;")
 
     def build_header(self):
         with ui.header().style("background-color:#252525"):

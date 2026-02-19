@@ -1,6 +1,6 @@
 
 from nicegui import ui, app, client
-from YaP.YaPCore.datetime_util import is_within_next_week, iso_today, format_minutes, this_week
+from YaP.YaPCore.datetime_util import is_within_next_week, iso_today, format_minutes, this_week, has_passed
 from YaP.YaPCore.version import VERSION_STRING_SIMPLE
 
 import math
@@ -106,16 +106,37 @@ class DashboardTab:
                 self.metric("Work done", format_minutes(sum(task["total_effort_done"] for task in tasks)), info="Total amount of work done.")
                 self.metric("This week", format_minutes(work_this_week), info="All the work done this week.")
                 self.metric("Today", format_minutes(work_today), info="All the work done today.")
-                
+
             with ui.row():
                 self.metric("Plan total", format_minutes(sum(task["effort"] for task in tasks)), info="Sum of all the effort required by tasks.")
 
+    def deadline_card(self):
 
+        tasks = self.plan.get_tasks_full()
+        subtasks_and_tasks = []
+        for task in tasks:
+            subtasks_and_tasks.extend([task]+task["subtasks"])
+
+        with self.dashboard_card("Deadlines"):
+            with ui.grid(columns=2).style("gap: 2px;").style("min-width: 80%"):
+                for task in subtasks_and_tasks:
+                    if task["date_end"] and not has_passed(task["date_end"]):
+
+                        tlabel = ui.label(task["name"])
+                        if "full_name" in task:
+                            tlabel.style("margin-left: 1.5em;") # subtask indent
+                        with ui.row():
+                            ui.label(f"ends {task["date_end"]}").style(f"color: #999;")
+                            if task["date_end"] == iso_today():
+                                ui.icon("priority_high", color="#f33").tooltip("Ends soon!")
+                            elif is_within_next_week(task["date_end"]):
+                                ui.icon("priority_high", color="#ffcc00").tooltip("Ends today!")
     @ui.refreshable
     def dashboard(self):
         self.pressure_meter()
 
         self.warnings()
 
-        self.work_card()
-
+        with ui.row():
+            self.work_card()
+            self.deadline_card()

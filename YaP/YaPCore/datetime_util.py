@@ -102,3 +102,17 @@ def get_week_days(d):
 def this_week():
 
     return get_week_days(date.today())
+
+def has_passed(iso_date_string):
+    """
+    Checks if an ISO-format date string represents a point in time that has passed.
+    """
+    try:
+        # Parse the ISO string into a datetime object
+        target_date = datetime.fromisoformat(iso_date_string)
+        
+        # Compare against current local time (for naive strings)
+        return target_date < datetime.now()
+            
+    except ValueError as e:
+        return f"Invalid ISO format: {e}"
