@@ -33,7 +33,7 @@ class TaskTab:
 
             with ui.column().style("gap: 0;"):
                 task_view_title("completion")
-                with ui.grid(columns=2):
+                with ui.grid(columns=2).style("gap: 0;"):
                     ui.label("Work required")
                     ui.label(format_minutes(task["effort"])).style('color: #999;') 
 
@@ -43,7 +43,15 @@ class TaskTab:
                         ui.label(f'({format_minutes(task["effort"] - task["total_effort_done"])} left)').style('color: #999;')
 
                     ui.label("Effort behind")
-                    ui.label(format_minutes(task["effort_behind"])).style('color: #999;') 
+
+                    with ui.row():
+                        with ui.row().style("gap: 1px;").tooltip("How many minutes behind on schedule for task AND subtasks"):
+                            ui.label(format_minutes(task["total_effort_behind"])).style('color: #999;') 
+                            ui.label("(total)").style("font-size:0.65em; color: #888")
+
+                        with ui.row().style("gap: 1px;").tooltip("How many minutes behind on schedule for only main task"):
+                            ui.label(format_minutes(task["effort_behind"])).style('color: #999;') 
+                            ui.label("(base)").style("font-size:0.65em; color: #888")
 
                 ui.label(f"{round(task["percent_completed"]*100, 2)}% completed").style("text-transform: uppercase; font-weight: 100; color: #AAA; font-size: 0.7em; letter-spacing: 1px;")
                 ui.linear_progress(task["percent_completed"], show_value=False).props("size=md stripe track-color='grey-8'").style("width: 100%;")
@@ -78,6 +86,10 @@ class TaskTab:
 
                                 if subtask["date_end"]:
                                     ui.label(f"due {subtask["date_end"]}").style("color: #666").tooltip("Deadline")
+
+                                if subtask["effort_behind"]:
+                                    ui.label(f"{format_minutes(subtask["effort_behind"])} behind").style("color: #666").tooltip("How many minutes behind ideal schedule")
+
 
                                 with ui.row().style("display: flex; align-items: center; justify-content: flex-end; gap: 10px; ;margin-left: auto;border-radius: 10px;background: rgba(255, 255, 255, 0.02);border: 1px solid rgba(255, 255, 255, 0.04);"):
                                     ui.button(icon='edit', 

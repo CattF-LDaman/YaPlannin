@@ -5,13 +5,18 @@ YaPlannin
 TODO:
 
 Dashboard:
+
+- Make it so you can't add more work to (sub)task than effort
+- Implement work session overview card on hover in schedule
+
 - Warnings and notifications: show warnings like "Deadline coming up", or "Behind schedule on task X"
 
 - Deadlines overview
 --> Include subtask deadlines, below task deadline with a little indent
 
-- Effort behind overview: work TODO
+- Effort behind overview: work to-be-done
 - Effort overview: total effort to be done, total effort done, percentage completed, etc.
 
-
+- Add sharing access to plans to other accounts
+- Fix that accounts can be overwritten by creating new user with same username
 ---------------------------

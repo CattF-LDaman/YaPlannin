@@ -5,6 +5,7 @@ from YaP.YaPCore.version import VERSION_STRING_SIMPLE
 
 from .task_tab import TaskTab
 from .schedule_tab import ScheduleTab
+from .dashboard_tab import DashboardTab
 
 @ui.page("/plan/{plan_id}")
 def plan_gui(plan_id, client: client.Client):
@@ -126,6 +127,8 @@ class PlanGUI:
             #         self.plan.update_subtask(subtask_id = task_id, name = task_name, description = task_desc, date_end = task_end if task_end else None, target_effort = req_effort or 0)
             #         self.server.log(f"[GUI] [{self.gui_user}] Subtask for {parent_task['name']} updated: {task_name}")
             ui.notify(f"Work {'created' if not task else 'updated'}.", type="positive")
+            self.schedule.refresh()
+            self.task_list.refresh(task)
 
     async def task_edit(self, task_id: str = None, parent_task: str = None):
         task = None
@@ -203,10 +206,16 @@ class PlanGUI:
 
 
         with ui.tabs().classes('w-full') as tabs:
+            dashboard_tab = ui.tab('Dashboard')
             tasks_tab = ui.tab('Tasks')
             schedule_tab = ui.tab('Schedule')
 
-        with ui.tab_panels(tabs, value=tasks_tab).classes('w-full').style("border-radius:10px;"):
+        with ui.tab_panels(tabs, value=dashboard_tab).classes('w-full').style("border-radius:10px;"):
+            with ui.tab_panel(dashboard_tab):
+                
+                self.dashboard = DashboardTab(self).dashboard
+                self.dashboard()
+
             with ui.tab_panel(tasks_tab):
                 
                 self.task_list = TaskTab(self).tasks_list
@@ -214,4 +223,5 @@ class PlanGUI:
 
             with ui.tab_panel(schedule_tab):
 
-                ScheduleTab(self).schedule()
+                self.schedule = ScheduleTab(self).schedule
+                self.schedule()

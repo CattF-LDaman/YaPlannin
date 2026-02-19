@@ -46,3 +46,47 @@ def time_ago(minutes):
     
     # Return formatted string
     return past_time.strftime("%H:%M")
+
+def is_this_week(iso_str):
+    """
+    Checks if an ISO format string (YYYY-MM-DD) falls within the 
+    current ISO week (Monday to Sunday).
+    """
+    try:
+        # Parse the input string into a date object
+        target_date = datetime.fromisoformat(iso_str).date()
+        
+        # Get today's date
+        today = date.today()
+        
+        # Find the start of the current week (Monday)
+        # weekday() returns 0 for Monday, 6 for Sunday
+        start_of_week = today - timedelta(days=today.weekday())
+        
+        # Find the end of the current week (Sunday)
+        end_of_week = start_of_week + timedelta(days=6)
+        
+        return start_of_week <= target_date <= end_of_week
+    
+    except ValueError, TypeError:
+        # Returns False if the string format is invalid
+        return False
+    
+def is_within_next_week(iso_str):
+    """
+    Checks if an ISO format string is today or within the next 7 days.
+    """
+    try:
+        # 1. Convert the string to a date object
+        target_date = datetime.fromisoformat(iso_str).date()
+        
+        # 2. Define our sliding window
+        today = date.today()
+        seven_days_from_now = today + timedelta(days=7)
+        
+        # 3. Check if target falls in that range (inclusive)
+        return today <= target_date <= seven_days_from_now
+        
+    except (ValueError, TypeError):
+        # Returns False if input is not a valid ISO string or not a string at all
+        return False

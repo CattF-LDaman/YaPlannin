@@ -257,7 +257,7 @@ class PlanData:
     # ----------------------------
     # Seamless metrics (integrated)
     # ----------------------------
-    def get_task_progress(self, task):
+    def get_task_progress(self, task, subtasks):
         # Parse the strings into date objects
         start = date.fromisoformat(task["date_start"])
         end = date.fromisoformat(task["date_end"])
@@ -277,7 +277,23 @@ class PlanData:
             # (e.g., if today is before the start date or after the end date)
             progress = max(0.0, min(1.0, elapsed / total_duration))
 
-        return total_duration, progress
+        subtask_progresses = {}
+        for subtask in subtasks:
+            sub_end = date.fromisoformat(subtask["date_end"]) if subtask["date_end"] else end
+            total_sub_duration = (sub_end - start).days
+
+            # 2. Get the progress percentage (0 to 1)
+            if total_sub_duration <= 0:
+                # Avoid division by zero: if start and end are the same day
+                sub_progress = 1.0 if today >= sub_end else 0.0
+            else:
+                sub_elapsed = (today - start).days
+                # Use max/min to clamp the value between 0.0 and 1.0
+                # (e.g., if today is before the start date or after the end date)
+                sub_progress = max(0.0, min(1.0, sub_elapsed / total_sub_duration))
+            subtask_progresses[subtask["id"]] = total_sub_duration, sub_progress
+
+        return total_duration, progress, subtask_progresses
 
     def _apply_task_metrics(self, task: Dict[str, Any], subtasks: List[Dict[str, Any]]) -> Dict[str, Any]:
         base_effort = int(task["base_effort"])
@@ -292,21 +308,52 @@ class PlanData:
         percent = (total_done / effort) if effort > 0 else 0.0
 
         if task["date_end"]:
-            duration_days, progress_necessary = self.get_task_progress(task)
-            effort_necessary = math.ceil(progress_necessary*effort)
-            effort_behind = max(effort_necessary - total_done, 0)
+            base_duration_days, base_progress_necessary, subtask_progresses = self.get_task_progress(task, subtasks)
+            base_effort_necessary = math.ceil(base_progress_necessary*base_effort)
+            base_effort_behind = max(base_effort_necessary - base_done, 0)
+            base_daily_effort = base_effort/base_duration_days
+            base_weekly_effort = base_daily_effort * 7
         else:
-            effort_behind = effort_necessary = progress_necessary = duration_days = 0
+            base_effort_behind = base_effort_necessary = base_progress_necessary = base_duration_days = base_daily_effort = base_weekly_effort = 0
+            subtask_progresses = None
+
+        total_effort_behind = base_effort_behind
+
+        for subtask in subtasks:
+            subtask["date_start"] = task["date_start"]
+            subtask["full_name"] = f"{task['name']}: {subtask['name']}"
+
+            if subtask_progresses:
+                sub_duration_days, sub_progress_necessary = subtask_progresses[subtask["id"]]
+                sub_effort_necessary = math.ceil(sub_progress_necessary*subtask["target_effort"])
+                sub_effort_behind = max(sub_effort_necessary - subtask["effort_done"], 0)
+                sub_daily_effort = subtask["target_effort"]/sub_duration_days
+                sub_weekly_effort = sub_daily_effort*7
+
+                subtask["duration_days"] = sub_duration_days
+                subtask["progress_necessary"] = sub_progress_necessary
+                subtask["effort_necessary"] = sub_effort_necessary
+                subtask["effort_behind"] = sub_effort_behind
+                subtask["daily_effort"] = sub_daily_effort
+                subtask["weekly_effort"] = sub_weekly_effort
+
+                total_effort_behind += sub_effort_behind
+            else:
+                subtask["duration_days"] = subtask["progress_necessary"] = subtask["effort_necessary"] = subtask["effort_behind"] = None
+
 
         task = dict(task)
         task["subtasks"] = subtasks
         task["effort"] = effort
         task["total_effort_done"] = total_done
         task["percent_completed"] = percent
-        task["duration_days"] = duration_days
-        task["progress_necessary"] = progress_necessary
-        task["effort_necessary"] = effort_necessary
-        task["effort_behind"] = effort_behind
+        task["duration_days"] = base_duration_days
+        task["progress_necessary"] = base_progress_necessary
+        task["effort_necessary"] = base_effort_necessary
+        task["effort_behind"] = base_effort_behind
+        task["total_effort_behind"] = total_effort_behind
+        task["daily_effort"] = base_daily_effort
+        task["weekly_effort"] = base_weekly_effort
 
         return task
 
