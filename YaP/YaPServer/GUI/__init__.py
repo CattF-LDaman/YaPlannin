@@ -170,7 +170,7 @@ class GUI:
                 cmd.value = ""
         cmd.on("keydown.enter", run_cmd)
 
-        with ui.footer().style("background-color: #111;"):
+        with ui.footer().style("background: 0; padding: 0;"):
             ui.label("Made with ❤️ by Luwe Daman").style("width: 100%; text-align: center; font-size: 0.75em; font-weight: 100;")
 
     def build_header(self):
