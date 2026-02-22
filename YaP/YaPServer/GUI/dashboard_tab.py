@@ -91,7 +91,7 @@ class DashboardTab:
         
         with ui.column().style("gap: 0; width: 100%;"):
             ui.label("Pressure Meter").style("text-transform: uppercase; font-weight: 100; color: #DDD; font-size: 0.7em; width: 100%; text-align: center;")
-            ui.label(f"{'+' if pressure >  0 else '-'} {abs(pressure)}").style(f"width: 100%; text-align: center; font-size: 2em; font-weight: bold; color: {'#f33' if pressure > 0 else '#3f3'}")
+            ui.label(f"{'↓' if pressure >  0 else '↑'} {abs(pressure)}").style(f"width: 100%; text-align: center; font-size: 2em; font-weight: bold; color: {'#f33' if pressure > 0 else '#3f3'}")
             ui.linear_progress(abs(pressure)/max(total_effort, 1), show_value=False).props("size=xl stripe track-color='grey-8' size='20px'"+pstyle).style("width: 100%;")
 
     def work_card(self):
@@ -101,14 +101,20 @@ class DashboardTab:
         curr_week = this_week()
         work_this_week = self.plan.get_work_minutes_between(curr_week[0], curr_week[-1])
         work_today = self.plan.get_work_minutes_between(iso_today(), iso_today())
+        total_effort_done = sum(task["total_effort_done"] for task in tasks)
+        total_effort = sum(task["effort"] for task in tasks)
+
+        completed_percent = round(total_effort_done/total_effort*100,2) if total_effort else 0
+
         with self.dashboard_card("Work"):
             with ui.row():
-                self.metric("Work done", format_minutes(sum(task["total_effort_done"] for task in tasks)), info="Total amount of work done.")
+                self.metric("Work done", format_minutes(total_effort_done), info="Total amount of work done.")
                 self.metric("This week", format_minutes(work_this_week), info="All the work done this week.")
                 self.metric("Today", format_minutes(work_today), info="All the work done today.")
 
             with ui.row():
-                self.metric("Plan total", format_minutes(sum(task["effort"] for task in tasks)), info="Sum of all the effort required by tasks.")
+                self.metric("Plan total", format_minutes(total_effort), info="Sum of all the effort required by tasks.")
+                self.metric("Completed", f"{completed_percent}%", info="Percentage of effort done.")
 
     def deadline_card(self):
 
@@ -122,15 +128,48 @@ class DashboardTab:
                 for task in subtasks_and_tasks:
                     if task["date_end"] and not has_passed(task["date_end"]):
 
-                        tlabel = ui.label(task["name"])
+                        tlabel = ui.label(task["name" if "full_name" not in task else "full_name"])
                         if "full_name" in task:
                             tlabel.style("margin-left: 1.5em;") # subtask indent
                         with ui.row():
                             ui.label(f"ends {task["date_end"]}").style(f"color: #999;")
                             if task["date_end"] == iso_today():
-                                ui.icon("priority_high", color="#f33").tooltip("Ends soon!")
+                                ui.icon("priority_high", color="#f33").tooltip("Ends today!")
                             elif is_within_next_week(task["date_end"]):
-                                ui.icon("priority_high", color="#ffcc00").tooltip("Ends today!")
+                                ui.icon("priority_high", color="#ffcc00").tooltip("Ends soon!")
+
+    def progress_card(self):
+
+        tasks = self.plan.get_tasks_full()
+
+        def task_progress_view(task, end):
+            with ui.row():
+                ui.label(f"{format_minutes(task["effort_behind"])} behind" if task["effort_behind"] else "On schedule").style(f"color: #999;")
+                if task["effort_behind"] > task["weekly_effort"]*2:
+                    ui.icon("priority_high", color="#f33").tooltip("2 weeks behind schedule!")
+                elif task["effort_behind"] > task["weekly_effort"] and is_within_next_week(end):
+                    ui.icon("priority_high", color="#f3f").tooltip("Behind schedule and deadline approaching!")
+                elif task["effort_behind"] > task["weekly_effort"]:
+                    ui.icon("priority_high", color="#ffcc00").tooltip("Week behind schedule!")
+
+        with self.dashboard_card("Progress"):
+            with ui.grid(columns=2).style("gap: 2px;").style("min-width: 80%"):
+                for task in tasks:
+                    # if task["date_end"] or "subtask_end" in task:
+                    #     end = task["date_end"] if task["date_end"] else task["subtask_end"]
+                    if task["date_end"]:
+
+                        ui.label(task["name"])
+
+                        task_progress_view(task, task["date_end"])
+
+
+                        for subtask in task["subtasks"]:
+                            if subtask["subtask_end"]:
+                                ui.label(subtask["name"]).style("margin-left: 1.5em;") # subtask indent
+                                task_progress_view(subtask, subtask["subtask_end"])
+
+
     @ui.refreshable
     def dashboard(self):
         self.pressure_meter()
@@ -139,4 +178,5 @@ class DashboardTab:
 
         with ui.row():
             self.work_card()
+            self.progress_card()
             self.deadline_card()

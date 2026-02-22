@@ -20,4 +20,8 @@ Dashboard:
 - Add sharing access to plans to other accounts
 - Fix that accounts can be overwritten by creating new user with same username
 - Fix date_end can be set before date_start
+
+Problems:
+
+- Subtasks with an end deadline don't really function correctly of the parent task has no deadline
 ---------------------------

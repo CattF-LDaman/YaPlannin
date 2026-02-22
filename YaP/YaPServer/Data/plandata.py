@@ -324,6 +324,7 @@ class PlanData:
         for subtask in subtasks:
             subtask["date_start"] = task["date_start"]
             subtask["full_name"] = f"{task['name']}: {subtask['name']}"
+            subtask["subtask_end"] = task["date_end"] if not subtask["date_end"] else subtask["date_end"]
 
             if subtask_progresses:
                 sub_duration_days, sub_progress_necessary = subtask_progresses[subtask["id"]]
