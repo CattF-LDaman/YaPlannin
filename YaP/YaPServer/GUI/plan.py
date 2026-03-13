@@ -1,5 +1,5 @@
 
-from nicegui import ui, app, client
+from nicegui import ui, app, client, events
 from YaP.YaPCore.datetime_util import is_iso_date, iso_today, format_minutes, now_time, time_ago
 from YaP.YaPCore.version import VERSION_STRING_SIMPLE
 
@@ -64,6 +64,13 @@ class PlanGUI:
 
             # menu_btn.on_click(lambda: btns.set_visibility(not btns.visible))
 
+    def panel_divider(self, title: str):
+
+        with ui.column().style("width: 100%; border-top: 2px solid #444; border-radius: 20px; border-left: 2px solid #444; border-right: 2px solid #444; padding: 2em; padding-top: 3px;") as pdiv:
+            with ui.column().style("gap: 0; width: 100%;"):
+                ui.label(title.upper()).style(f"color: #ccc; font-weight: 100; text-align: center; width: 100%")
+        return pdiv
+
     async def work_edit(self, work_id: str = None):
         work = None
         if work_id:
@@ -74,38 +81,71 @@ class PlanGUI:
                 ui.icon("hiking", size="2.3em")
                 ui.label("Add work" if not work else "Edit work").style("font-weight: bold; font-size: 1.6em")
             
-            task_options = {task['id']: task["name"] for task in self.plan.get_tasks()}
-            task = ui.select(task_options, label="Task").style("min-width: 60%")
+            with self.panel_divider("Task"):
 
-            subtask = ui.select({}, label="Subtask").style("min-width: 60%")
-            def update_subtask_options(e):
-                subtask_options = {st['id']: st["name"] for st in self.plan.get_subtasks_for_task(e.value)}
-                subtask_options[None] = "< empty >"
-                subtask.set_options(subtask_options, value=None)
-            task.on_value_change(update_subtask_options)
+                task_options = {task['id']: task["name"] for task in self.plan.get_tasks()}
+                task_select = ui.select(task_options, label="Task").style("min-width: 60%")
 
-            work_note = ui.input("Note", value=work["note"] if work else None).style("width: 100%;")
-            
-            work_date = ui.date_input("Date", value=(iso_today() if not work else work["day"]))
-            if not work:
-                today_switch = ui.switch("Change?", value=False)
-                work_date.bind_enabled_from(today_switch, "value")
-            
-            minutes_worked = ui.number(label="Minutes Worked", min=1, value=1 if not work else work["minutes"], suffix="minutes").style("min-width: 60%")
-            
-            work_time = ui.time_input(value=now_time() if not work else work["start_time"]).style("min-width: 60%")
-            now_switch = ui.switch("Now?", on_change=lambda e: work_time.set_visibility(not e.value))
+                subtask = ui.select({}, label="Subtask").style("min-width: 60%")
+                def update_subtask_options(e):
+                    subtask_options = {st['id']: st["name"] for st in self.plan.get_subtasks_for_task(e.value)}
+                    subtask_options[None] = "< empty >"
+                    subtask.set_options(subtask_options, value=None)
+                task_select.on_value_change(update_subtask_options)
+
+            with self.panel_divider("Activity"):
+
+                work_note = ui.input("Note", value=work["note"] if work else None).style("width: 100%;")
+                
+                with ui.row():
+                    work_date = ui.date_input("Date", value=(iso_today() if not work else work["day"]))
+                    if not work:
+                        today_switch = ui.switch("Change?", value=False)
+                        work_date.bind_enabled_from(today_switch, "value")
+                
+                # minutes_worked = ui.number(label="Minutes Worked", min=1, value=1 if not work else work["minutes"], suffix="minutes").style("min-width: 60%")
+                minutes_worked = ui.slider(min=0, max=1, value=0)
+                ui.label("- minutes").style("color: #aaa; font-size: 0.8em;").bind_text_from(minutes_worked, "value", backward=lambda v: f"{v if v else '-'} minutes")
+                def set_max_minutes(e: events.ValueChangeEventArguments, is_subtask: bool = False):
+                    if e.value:
+                        selector_value = e.value
+                        if is_subtask:
+                            obj = self.plan.get_subtask(selector_value)
+                            max_effort = obj["target_effort"] - obj["effort_done"]
+                        else:
+                            obj = self.plan.get_task(selector_value)
+                            max_effort = obj["base_effort"] - obj["effort_done"]
+                    else:
+                        # fallback to the current task select component value
+                        selector_value = task_select.value
+                        obj = self.plan.get_task(selector_value)
+                        max_effort = obj["base_effort"] - obj["effort_done"]
+                    minutes_worked._props['max'] = max_effort
+                    minutes_worked._props['step'] = 5 if max_effort > 200 else 1
+                    minutes_worked.set_value(0)
+                    minutes_worked.update()
+                subtask.on_value_change(lambda e: set_max_minutes(e, True))
+                task_select.on_value_change(set_max_minutes)
+
+            with self.panel_divider("Time"):
+
+                work_time = ui.time_input(value=now_time() if not work else work["start_time"]).style("min-width: 60%")
+                work_time.set_visibility(False)
+                now_switch = ui.switch("Now?", on_change=lambda e: work_time.set_visibility(not e.value), value=True)
 
             with ui.row():
                 def submit_fnc():
                     if not is_iso_date(work_date.value):
                         ui.notify("Work date should be a date with format YYYY-MM-DD", type="negative")
                         return
-                    if not task.value:
+                    if not task_select.value:
                         ui.notify("No task provided.", type="negative")
                         return
+                    if not minutes_worked.value:
+                        ui.notify("Please specify minutes worked with the slider in the bottom of 'ACTIVITY'", type="negative")
+                        return
                     timestamp = work_time.value if not now_switch.value else time_ago(minutes_worked.value)
-                    dialog.submit((task.value, subtask.value, work_note.value if work_note.value else "", work_date.value, minutes_worked.value, timestamp))
+                    dialog.submit((task_select.value, subtask.value, work_note.value if work_note.value else "", work_date.value, minutes_worked.value, timestamp))
                 ui.button("Create" if not work else "Save", color=self.server.config.gui.primary_color, on_click=submit_fnc)
                 ui.button("Cancel", color="#333", on_click=lambda: dialog.submit(None))
 
@@ -129,9 +169,10 @@ class PlanGUI:
             #     else:
             #         self.plan.update_subtask(subtask_id = task_id, name = task_name, description = task_desc, date_end = task_end if task_end else None, target_effort = req_effort or 0)
             #         self.server.log(f"[GUI] [{self.gui_user}] Subtask for {parent_task['name']} updated: {task_name}")
-            ui.notify(f"Work {'created' if not task else 'updated'}.", type="positive")
+            ui.notify(f"Work {'created' if not work else 'updated'}.", type="positive")
             self.schedule.refresh()
             self.task_list.refresh(task)
+            self.dashboard.refresh()
 
     async def task_edit(self, task_id: str = None, parent_task: str = None):
         task = None
@@ -194,6 +235,7 @@ class PlanGUI:
             
             open_target = (task_id if task else created_uuid) if not is_subtask else parent_task["id"]
             self.task_list.refresh(open_target)
+            self.dashboard.refresh()
     
     def dashboard(self):
 

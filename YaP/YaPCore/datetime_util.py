@@ -116,3 +116,19 @@ def has_passed(iso_date_string):
             
     except ValueError as e:
         return f"Invalid ISO format: {e}"
+    
+def days_until(iso_date_string, clamped: int = None):
+    """Calculates the number of days from today until a specific date."""
+    # Get today's date
+    today = date.today()
+    
+    # Create a date object for the target
+    target_date = date.fromisoformat(iso_date_string)
+    
+    # Subtracting two dates returns a timedelta object
+    delta = target_date - today
+    
+    return delta.days if not clamped else max(clamped, delta.days)
+
+def from_today(days: int) -> str:
+    return (date.today() + timedelta(days=days)).isoformat()

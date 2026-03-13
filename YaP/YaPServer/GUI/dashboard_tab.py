@@ -73,14 +73,24 @@ class DashboardTab:
                     lagging_tasks[name] = task
             if lagging_tasks:
                 with self.warning(title="Lagging behind", content="If you don't put more work in for these (sub)tasks, you will likely not finish in time:", highlighted=""):
-                    with ui.grid(columns=2).style("gap: 2px;").style("width: 100%"):
+                    with ui.grid(columns=2).style("gap: 2px; column-gap: 2em;").style("width: 100%"):
                         for task_name, task in lagging_tasks.items():
                             tlabel = ui.label(task_name)
                             if "full_name" in task:
                                 tlabel.style("margin-left: 1.5em;") # subtask indent
-                            bad_lag = task["effort_behind"] > task["weekly_effort"]*2
-                            ui.label(f"{format_minutes(task["effort_behind"])} behind").style(f"color: {"#999" if not bad_lag else "#F22"};").tooltip(f"Target weekly: {format_minutes(math.ceil(task["weekly_effort"]))}")
-
+                                bad_lag = task["effort_behind"] > task["weekly_effort"]*2
+                                ui.label(f"{format_minutes(task["effort_behind"])} behind").style(f"color: {"#999" if not bad_lag else "#F22"};").tooltip(f"Target weekly: {format_minutes(math.ceil(task["weekly_effort"]))}")
+                            else:
+                                
+                                with ui.row():
+                                    with ui.row().style("gap: 1px;").tooltip("How many minutes behind on schedule for task AND subtasks"):
+                                        ui.label(format_minutes(task["total_effort_behind"])).style(f"color: #999")
+                                        ui.label("(total)").style("font-size:0.65em; color: #888")
+                                    
+                                    bad_lag = task["effort_behind"] > task["weekly_effort"]*2
+                                    with ui.row().style("gap: 1px;"):
+                                        ui.label(format_minutes(task["effort_behind"])).style(f"color: {"#999" if not bad_lag else "#F22"};").tooltip(f"Target weekly: {format_minutes(math.ceil(task["weekly_effort"]))}")
+                                        ui.label("(base)").style("font-size:0.65em; color: #888")
     def pressure_meter(self):
 
         pressure, total_effort = self.plan.get_plan_pressure()
@@ -91,7 +101,7 @@ class DashboardTab:
         
         with ui.column().style("gap: 0; width: 100%;"):
             ui.label("Pressure Meter").style("text-transform: uppercase; font-weight: 100; color: #DDD; font-size: 0.7em; width: 100%; text-align: center;")
-            ui.label(f"{'↓' if pressure >  0 else '↑'} {abs(pressure)}").style(f"width: 100%; text-align: center; font-size: 2em; font-weight: bold; color: {'#f33' if pressure > 0 else '#3f3'}")
+            ui.label(f"{'💀' if pressure >  0 else '🚀'} {format_minutes(abs(pressure))}").style(f"width: 100%; text-align: center; font-size: 2em; font-weight: bold; color: {'#f33' if pressure > 0 else '#3f3'}")
             ui.linear_progress(abs(pressure)/max(total_effort, 1), show_value=False).props("size=xl stripe track-color='grey-8' size='20px'"+pstyle).style("width: 100%;")
 
     def work_card(self):
@@ -124,7 +134,7 @@ class DashboardTab:
             subtasks_and_tasks.extend([task]+task["subtasks"])
 
         with self.dashboard_card("Deadlines"):
-            with ui.grid(columns=2).style("gap: 2px;").style("min-width: 80%"):
+            with ui.grid(columns=2).style("gap: 2px; column-gap: 2em;").style("min-width: 80%"):
                 for task in subtasks_and_tasks:
                     if task["date_end"] and not has_passed(task["date_end"]):
 
@@ -153,7 +163,7 @@ class DashboardTab:
                     ui.icon("priority_high", color="#ffcc00").tooltip("Week behind schedule!")
 
         with self.dashboard_card("Progress"):
-            with ui.grid(columns=2).style("gap: 2px;").style("min-width: 80%"):
+            with ui.grid(columns=2).style("gap: 2px; column-gap: 2em;").style("min-width: 80%"):
                 for task in tasks:
                     # if task["date_end"] or "subtask_end" in task:
                     #     end = task["date_end"] if task["date_end"] else task["subtask_end"]
