@@ -191,9 +191,16 @@ class PlanGUI:
             task_name = ui.input("Name", value=task["name"] if task else None)
             task_desc = ui.textarea("Description", value=task["description"] if task else "").style("width: 100%;")
             
-            task_start = ui.date_input("Start", value=(iso_today() if not task else task["date_start"]) if not parent_task else parent_task["date_start"])
-            if is_subtask:
-                task_start.disable() # Subtasks don't have a start date, shared with parent
+            if not is_subtask:
+                start_value = iso_today() if not task else task["date_start"]
+            else:
+                # For subtasks, default to parent start when creating, or the subtask's own start when editing
+                if not task:
+                    start_value = parent_task["date_start"]
+                else:
+                    start_value = task.get("date_start", parent_task["date_start"])
+
+            task_start = ui.date_input("Start", value=start_value)
             # task_start.picker.props[":options"] = f'date => date >= "{iso_today()}"' # Ensure date not earlier then today
             
             task_end = ui.date_input("End", value=None if not task else task["date_end"]).props('clearable')
@@ -203,7 +210,7 @@ class PlanGUI:
             
             with ui.row():
                 def submit_fnc():
-                    if not is_subtask and not is_iso_date(task_start.value):
+                    if not is_iso_date(task_start.value):
                         ui.notify("Start should be a date with format YYYY-MM-DD", type="negative", position="center")
                         return
                     if task_end.value and not is_iso_date(task_end.value):
@@ -222,14 +229,14 @@ class PlanGUI:
                     created_uuid = self.plan.add_task(name = task_name, description = task_desc, date_start = task_start, date_end = task_end if task_end else None, base_effort = req_effort or 0)
                     self.server.log(f"[GUI] [{self.gui_user}] Task created: {task_name} {created_uuid}")
                 else:
-                    created_uuid = self.plan.add_subtask(task_id=parent_task["id"], name = task_name, description = task_desc, date_end = task_end if task_end else None, target_effort = req_effort or 0)
+                    created_uuid = self.plan.add_subtask(task_id=parent_task["id"], name = task_name, description = task_desc, date_start = task_start, date_end = task_end if task_end else None, target_effort = req_effort or 0)
                     self.server.log(f"[GUI] [{self.gui_user}] Subtask for {parent_task['name']} created: {task_name} {created_uuid}")
             else:
                 if not is_subtask:
                     self.plan.update_task(task_id = task_id, name = task_name, description = task_desc, date_start = task_start, date_end = task_end if task_end else None, base_effort = req_effort or 0)
                     self.server.log(f"[GUI] [{self.gui_user}] Task updated: {task_name}")
                 else:
-                    self.plan.update_subtask(subtask_id = task_id, name = task_name, description = task_desc, date_end = task_end if task_end else None, target_effort = req_effort or 0)
+                    self.plan.update_subtask(subtask_id = task_id, name = task_name, description = task_desc, date_start = task_start, date_end = task_end if task_end else None, target_effort = req_effort or 0)
                     self.server.log(f"[GUI] [{self.gui_user}] Subtask for {parent_task['name']} updated: {task_name}")
             ui.notify(f"{'Task' if not is_subtask else 'Subtask'} {task_name} {'created' if not task else 'updated'}.", type="positive")
             

@@ -39,9 +39,6 @@ body::before {
     /* Center the image and prevent tiling */
     background-repeat: no-repeat;
     background-position: center;
-    
-    /* Scale the logo - adjust '50vw' to make it larger or smaller */
-
 
     /* "Very very slight visibility" - adjust opacity between 0.01 and 0.05 */
     filter: grayscale(1) opacity(0.01); 

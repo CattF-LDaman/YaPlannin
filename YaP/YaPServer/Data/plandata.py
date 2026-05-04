@@ -66,6 +66,7 @@ class PlanData:
         task_id TEXT NOT NULL,
         name TEXT NOT NULL,
         description TEXT NOT NULL DEFAULT '',
+        date_start TEXT,
         date_end TEXT,
         target_effort INTEGER NOT NULL DEFAULT 0,
         effort_done INTEGER NOT NULL DEFAULT 0,
@@ -117,6 +118,30 @@ class PlanData:
         from .database import init_db, connect
         init_db(self.location, PlanData.SCHEMA)
         self.conn = connect(self.location)
+
+        # Lightweight migration: ensure subtasks.date_start exists for older databases
+        try:
+            cols = self.conn.execute("PRAGMA table_info(subtasks)").fetchall()
+            col_names = {c[1] for c in cols}
+            if "date_start" not in col_names:
+                self.server.log(f"[PlanData] Migrating subtasks table to add date_start for plan {plan_id}")
+                self.conn.execute("ALTER TABLE subtasks ADD COLUMN date_start TEXT")
+                # Backfill: default existing subtasks' start date to their parent task start
+                self.conn.execute(
+                    """
+                    UPDATE subtasks
+                    SET date_start = (
+                        SELECT t.date_start
+                        FROM tasks t
+                        WHERE t.id = subtasks.task_id
+                    )
+                    WHERE date_start IS NULL
+                    """
+                )
+                self.conn.commit()
+        except Exception as e:
+            # Log but don't crash the server if migration fails
+            self.server.log(f"[PlanData] Warning: failed to migrate subtasks.date_start for plan {plan_id}: {e}")
 
         self.server.log(f"Plan: {self.location}")
 
@@ -195,22 +220,27 @@ class PlanData:
     # ----------------------------
     # SUBTASKS CRUD
     # ----------------------------
-    def add_subtask(self, task_id: str, name: str, description: str, date_end: Optional[str] = None, target_effort: int = 0) -> str:
+    def add_subtask(self, task_id: str, name: str, description: str, date_start: Optional[str] = None, date_end: Optional[str] = None, target_effort: int = 0) -> str:
         if not self.get_task(task_id):
             raise ValueError(f"Cannot create subtask: task not found {task_id}")
+
+        # Default subtask start date to parent task start if not provided
+        if date_start is None:
+            parent_task = self.get_task(task_id)
+            date_start = parent_task["date_start"]
 
         subtask_id = _uid()
         self.conn.execute(
             """
-            INSERT INTO subtasks (id, task_id, name, description, date_end, target_effort, effort_done)
-            VALUES (?, ?, ?, ?, ?, ?, 0)
+            INSERT INTO subtasks (id, task_id, name, description, date_start, date_end, target_effort, effort_done)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
             """,
-            (subtask_id, task_id, name, description, date_end, int(target_effort)),
+            (subtask_id, task_id, name, description, date_start, date_end, int(target_effort)),
         )
         self.conn.commit()
         return subtask_id
 
-    def update_subtask(self, subtask_id: str, name: Optional[str] = None, description: Optional[str] = None, date_end: Optional[str] = None, target_effort: Optional[int] = None) -> None:
+    def update_subtask(self, subtask_id: str, name: Optional[str] = None, description: Optional[str] = None, date_start: Optional[str] = None, date_end: Optional[str] = None, target_effort: Optional[int] = None) -> None:
         sub = self.get_subtask(subtask_id)
         if not sub:
             raise ValueError(f"Subtask not found: {subtask_id}")
@@ -218,12 +248,13 @@ class PlanData:
         self.conn.execute(
             """
             UPDATE subtasks
-            SET name = ?, description = ?, date_end = ?, target_effort = ?
+            SET name = ?, description = ?, date_start = ?, date_end = ?, target_effort = ?
             WHERE id = ?
             """,
             (
                 name if name is not None else sub["name"],
                 description if description is not None else sub["description"],
+                date_start if date_start is not None else sub.get("date_start"),
                 date_end,
                 int(target_effort) if target_effort is not None else sub["target_effort"],
                 subtask_id,
@@ -279,15 +310,17 @@ class PlanData:
 
         subtask_progresses = {}
         for subtask in subtasks:
+            # Subtasks can have their own start date; fall back to task start if missing
+            sub_start = date.fromisoformat(subtask["date_start"]) if subtask.get("date_start") else start
             sub_end = date.fromisoformat(subtask["date_end"]) if subtask["date_end"] else end
-            total_sub_duration = (sub_end - start).days
+            total_sub_duration = (sub_end - sub_start).days
 
             # 2. Get the progress percentage (0 to 1)
             if total_sub_duration <= 0:
                 # Avoid division by zero: if start and end are the same day
                 sub_progress = 1.0 if today >= sub_end else 0.0
             else:
-                sub_elapsed = (today - start).days
+                sub_elapsed = (today - sub_start).days
                 # Use max/min to clamp the value between 0.0 and 1.0
                 # (e.g., if today is before the start date or after the end date)
                 sub_progress = max(0.0, min(1.0, sub_elapsed / total_sub_duration))
@@ -322,7 +355,9 @@ class PlanData:
         total_pressure = base_pressure
 
         for subtask in subtasks:
-            subtask["date_start"] = task["date_start"]
+            # Ensure a date_start is present for metrics; default to parent task start
+            if not subtask.get("date_start"):
+                subtask["date_start"] = task["date_start"]
             subtask["full_name"] = f"{task['name']}: {subtask['name']}"
             subtask["subtask_end"] = task["date_end"] if not subtask["date_end"] else subtask["date_end"]
 
