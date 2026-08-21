@@ -68,7 +68,7 @@ def is_this_week(iso_str):
         
         return start_of_week <= target_date <= end_of_week
     
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         # Returns False if the string format is invalid
         return False
     

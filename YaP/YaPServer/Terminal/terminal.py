@@ -43,8 +43,10 @@ class Terminal:
 
         self.server.log("You can now input commands.")
         while self.running:
-
-            cmd_in = input()
+            try:
+                cmd_in = input()
+            except EOFError:
+                break
 
             if self.running:
                 self.parse(cmd_in)

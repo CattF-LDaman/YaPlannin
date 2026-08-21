@@ -1,0 +1,18 @@
+services:
+  yap:
+    build: .
+    ports:
+      - "${YAP_HOST_PORT:-8080}:8080"
+    environment:
+      YAP_DATA_DIR: /data/YaPServer
+      YAP_HOST: 0.0.0.0
+      YAP_PORT: 8080
+      # Optional first-run admin account (only created if no user exists yet)
+      YAP_BOOTSTRAP_USER: ${YAP_BOOTSTRAP_USER:-}
+      YAP_BOOTSTRAP_PASSWORD: ${YAP_BOOTSTRAP_PASSWORD:-}
+    volumes:
+      - yap-data:/data/YaPServer
+    restart: unless-stopped
+
+volumes:
+  yap-data:

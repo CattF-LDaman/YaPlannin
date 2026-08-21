@@ -189,4 +189,14 @@ class GUI:
         self.create_logo_files()
         app.add_media_files("/static", self.static_dir)
 
-        ui.run(reload=False, port=80, dark=True, title="YaPlannin", favicon="🧭", storage_secret=self.server.config.secret.browser_storage_secret)
+        run_kwargs = {
+            "reload": False,
+            "port": int(os.environ.get("YAP_PORT", "80")),
+            "dark": True,
+            "title": "YaPlannin",
+            "favicon": "🧭",
+            "storage_secret": self.server.config.secret.browser_storage_secret,
+        }
+        if host := os.environ.get("YAP_HOST"):
+            run_kwargs["host"] = host
+        ui.run(**run_kwargs)

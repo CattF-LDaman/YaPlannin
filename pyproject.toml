@@ -1,0 +1,26 @@
+[project]
+name = "yaplannin"
+version = "0.0.1"
+description = "Self-hosted planning tool for breaking goals into tasks, tracking effort, and staying on schedule."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Luwe Daman" },
+]
+dependencies = [
+    "nicegui==3.12.1",
+    "requests>=2.32.0",
+    "colorama>=0.4.6",
+]
+
+[project.urls]
+Repository = "https://github.com/CattF-LDaman/YaPlannin"
+Guide = "https://github.com/CattF-LDaman/YaPlannin/blob/main/GUIDE.MD"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["YaP*"]

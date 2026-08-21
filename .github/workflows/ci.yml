@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Import smoke test
+        env:
+          PYTHONPATH: .
+        run: python -c "from YaP.YaPServer.server import Server"
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker compose build
+
+      - name: Start container
+        env:
+          YAP_BOOTSTRAP_USER: ci_admin
+          YAP_BOOTSTRAP_PASSWORD: ci_test_pass
+        run: docker compose up -d
+
+      - name: Wait for healthy service
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/login > /dev/null; then
+              echo "Service is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Service did not become ready in time"
+          docker compose logs
+          exit 1
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

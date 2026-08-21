@@ -21,17 +21,28 @@ The app runs as a local web server. After you start it, you use it at `http://lo
 
 ## Requirements
 
+Choose one deployment path:
+
+**Local Python**
+
 - **Python 3.10+** (3.11 or 3.12 recommended)
 - **Windows, macOS, or Linux**
 - A browser (Chrome, Firefox, Edge, etc.)
 
-On Windows, the server listens on **port 80**, which may require running the terminal as Administrator. See [Troubleshooting](#troubleshooting) if you hit permission errors.
+On Windows, the server listens on **port 80** by default, which may require running the terminal as Administrator. See [Troubleshooting](#troubleshooting) if you hit permission errors.
+
+**Docker**
+
+- **Docker Engine** and **Docker Compose v2**
+- A browser
+
+Docker runs the app on **port 8080** by default. See [Docker deployment](#docker-deployment).
 
 ---
 
 ## Installation
 
-### 1. Get the code
+### 1. Get the source
 
 Clone or download the repository, then open a terminal in the project folder:
 
@@ -81,6 +92,131 @@ You should see a log file path printed, then `You can now input commands.` The w
 ### 4. Open the app
 
 Go to **http://localhost** in your browser.
+
+---
+
+## Docker deployment
+
+The recommended way to run YaPlannin on a server or without installing Python locally.
+
+### Prerequisites
+
+- Docker Engine
+- Docker Compose v2 (`docker compose` command)
+
+### First run
+
+1. Clone the repository and enter the project folder (see [Installation](#installation) step 1).
+
+2. Copy the example environment file and optionally set a bootstrap admin:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Edit `.env` if you want the first user created automatically on startup:
+
+   ```env
+   YAP_BOOTSTRAP_USER=admin
+   YAP_BOOTSTRAP_PASSWORD=your-secure-password
+   ```
+
+3. Build and start the container:
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+4. Open **http://localhost:8080/login** in your browser.
+
+   Docker maps host port **8080** to the container by default. Change `YAP_HOST_PORT` in `.env` if that port is already in use.
+
+### Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `YAP_HOST_PORT` | `8080` | Host port mapped to the container web UI |
+| `YAP_PORT` | `8080` | Port the app listens on inside the container |
+| `YAP_HOST` | `0.0.0.0` | Bind address inside the container |
+| `YAP_DATA_DIR` | `/data/YaPServer` | Persistent data directory inside the container |
+| `YAP_BOOTSTRAP_USER` | *(unset)* | Username to create on first startup if no users exist |
+| `YAP_BOOTSTRAP_PASSWORD` | *(unset)* | Password for the bootstrap user |
+
+See [`.env.example`](.env.example) for a copy-paste template.
+
+### Create the first user (Docker)
+
+There are no default logins. Use one of these approaches:
+
+**Option A — Bootstrap env vars (recommended)**
+
+Set `YAP_BOOTSTRAP_USER` and `YAP_BOOTSTRAP_PASSWORD` in `.env` before the first `docker compose up`. The user is created only if it does not already exist.
+
+**Option B — Server terminal**
+
+Attach to the running container and type `createuser` at the prompt. This requires an interactive TTY and is less convenient than bootstrap env vars:
+
+```bash
+docker compose exec -it yap sh
+# Inside the container, the server process owns stdin; bootstrap env vars are easier.
+```
+
+**Option C — Web UI command box**
+
+After logging in, enable **Logs** on the home page and run `createuser <user> <pass>` in the command input. This only works once you already have an account.
+
+### Data persistence
+
+Docker stores all server data in a named volume (`yap-data`), mounted at `/data/YaPServer` inside the container:
+
+| Folder / file | Contents |
+|---------------|----------|
+| `users/` | Account files (hashed passwords) |
+| `storage/YaP.db` | Plan metadata (SQLite) |
+| `storage/<plan-id>/` | Per-plan databases |
+| `logs/` | Server log files |
+| `configs/` | Server configuration |
+
+**Back up the volume** before upgrades or removal:
+
+```bash
+docker run --rm -v yaplannin_yap-data:/data alpine tar czf - YaPServer > yap-backup.tar.gz
+```
+
+Restore (with the stack stopped):
+
+```bash
+docker run --rm -i -v yaplannin_yap-data:/data alpine tar xzf - -C /data < yap-backup.tar.gz
+```
+
+### Day-to-day operations
+
+```bash
+docker compose logs -f          # follow server logs
+docker compose restart          # restart the container
+docker compose down             # stop (data volume is kept)
+docker compose down -v          # stop and DELETE all plans/users (destructive)
+```
+
+The container includes a health check that polls the `/login` page every 30 seconds.
+
+### Docker troubleshooting
+
+**Container keeps restarting**
+
+Check logs: `docker compose logs --tail 50`. Common causes: missing dependency (rebuild with `--build`), syntax error in mounted code if you bind-mount the repo.
+
+**Port already in use**
+
+Change `YAP_HOST_PORT` in `.env` (e.g. `8081`) and run `docker compose up -d` again. Open `http://localhost:8081/login`.
+
+**Bootstrap user already exists**
+
+If `YAP_BOOTSTRAP_USER` is set but that user already exists, startup continues normally and the message `already exists, skipping` appears in the logs. Log in with the existing password or use `changepass` after login via the web command box.
+
+**Wrong credentials at login**
+
+Ensure the bootstrap user was created on first run (check logs for `Bootstrap user '...' created`). Usernames are case-sensitive.
 
 ---
 
@@ -189,6 +325,7 @@ YaPlannin does **not** keep plans inside the git repo. Everything is stored loca
 | Windows | `%LOCALAPPDATA%\YaPServer\` |
 | macOS | `~/Library/Application Support/YaPServer/` |
 | Linux | `~/.local/share/YaPServer/` |
+| Docker | Named volume `yap-data` → `/data/YaPServer` inside the container |
 
 Under that folder:
 
@@ -212,16 +349,50 @@ For internet exposure, use a reverse proxy (nginx, Caddy), HTTPS, and strong pas
 
 ### Change the port
 
-If port 80 is blocked or needs admin rights, edit `YaP/YaPServer/GUI/__init__.py` and change `port=80` in the `ui.run(...)` call near the bottom of the file (e.g. `port=8080`). Then open `http://localhost:8080`.
+Use environment variables instead of editing source code.
+
+**Local Python:**
+
+```bash
+YAP_PORT=8080 python run_server.py
+```
+
+Then open **http://localhost:8080**.
+
+**Docker:**
+
+Set `YAP_HOST_PORT` in `.env` (host-side mapping) and restart:
+
+```env
+YAP_HOST_PORT=8081
+```
+
+```bash
+docker compose up -d
+```
+
+Open **http://localhost:8081/login**.
+
+You can also set `YAP_PORT` inside the container if needed; Docker Compose passes it via `docker-compose.yml`.
 
 ---
 
 ## Troubleshooting
 
-### "Permission denied" or port 80 won't bind (Windows)
+### "Permission denied" or port 80 won't bind (Windows / local)
 
 - Run PowerShell or Command Prompt **as Administrator**, then start the server again, **or**
-- Change the port to something above 1024 (e.g. 8080) as described above
+- Use a port above 1024: `YAP_PORT=8080 python run_server.py` (see [Change the port](#change-the-port))
+
+### Docker container won't start or keeps restarting
+
+- Run `docker compose logs --tail 50` and look for tracebacks
+- Rebuild: `docker compose up -d --build`
+- See [Docker troubleshooting](#docker-troubleshooting)
+
+### Port already in use (Docker)
+
+- Change `YAP_HOST_PORT` in `.env` and run `docker compose up -d` again
 
 ### Page won't load
 
@@ -249,9 +420,14 @@ User data lives in `%LOCALAPPDATA%\YaPServer` (or the macOS/Linux paths above), 
 
 ## Quick reference
 
+**Local Python**
+
 ```text
 # Start server
 python run_server.py
+
+# Start on alternate port
+YAP_PORT=8080 python run_server.py
 
 # Create first user (in server terminal)
 createuser alice s3cure_pass
@@ -261,6 +437,26 @@ http://localhost
 
 # Stop server (in server terminal)
 stop
+```
+
+**Docker**
+
+```text
+# First run
+cp .env.example .env
+docker compose up -d --build
+
+# Browser
+http://localhost:8080/login
+
+# Logs
+docker compose logs -f
+
+# Stop (keep data)
+docker compose down
+
+# Stop and delete all data
+docker compose down -v
 ```
 
 ---
