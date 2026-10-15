@@ -54,7 +54,7 @@ Application code lives in this repository. User data (plans, accounts, logs, con
 git clone https://github.com/CattF-LDaman/YaPlannin.git
 cd YaPlannin
 cp .env.example .env
-# Optional: edit .env to set YAP_BOOTSTRAP_USER and YAP_BOOTSTRAP_PASSWORD
+# edit .env to set YAP_BOOTSTRAP_USER and YAP_BOOTSTRAP_PASSWORD !!!
 docker compose up -d --build
 ```
 
