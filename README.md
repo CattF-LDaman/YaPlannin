@@ -133,8 +133,6 @@ YaPlannin/
 | Document | Contents |
 |----------|----------|
 | [GUIDE.MD](GUIDE.MD) | Installation, Docker deployment, usage, data storage, troubleshooting |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Development setup and contribution notes |
-| [CHANGELOG.md](CHANGELOG.md) | Release history |
 
 ---
 
